@@ -1,0 +1,6 @@
+name: 'LOOM Deploy'
+type: module
+description: 'LOOM Deploy'
+core: 8.x
+package: 'LOOM'
+version: 1.0.0

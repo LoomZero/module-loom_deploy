@@ -1,0 +1,9 @@
+services:
+  loom.deploy.manager:
+    class: Drupal\loom_deploy\Manager\DeployManager
+    tags:
+      - { name: service_collector, tag: loom_deploy, call: addService }
+  loom.deploy.test:
+    class: Drupal\loom_deploy\Test\DeployTest
+    tags:
+        - { name: loom_deploy }

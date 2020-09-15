@@ -1,0 +1,6 @@
+services:
+  loom_deploy.loom.deploy:
+    class: Drupal\loom_deploy\Command\DeployCommand
+    arguments: []
+    tags:
+      - { name: drupal.command }

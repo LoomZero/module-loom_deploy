@@ -1,0 +1,14 @@
+{
+  "name": "drupal/loom_deploy",
+  "type": "drupal-module",
+  "description": "LOOM Deploy",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0+",
+  "homepage": "https://www.drupal.org/project/loom_deploy",
+  "minimum-stability": "dev",
+  "support": {
+    "issues": "https://www.drupal.org/project/issues/loom_deploy",
+    "source": "http://cgit.drupalcode.org/loom_deploy"
+  },
+  "require": { }
+}
