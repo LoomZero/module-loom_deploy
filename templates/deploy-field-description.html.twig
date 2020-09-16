@@ -1,0 +1,34 @@
+<div class="deploy-field-description" title="{{ field.class }}">
+  <div class="deploy-field-description__column">
+    <div class="deploy-field-description__label">
+      Type:
+    </div>
+    <div class="deploy-field-description__label">
+      Module:
+    </div>
+    <div class="deploy-field-description__label">
+      Deploy:
+    </div>
+    <div class="deploy-field-description__label">
+      Original:
+    </div>
+  </div>
+  <div class="deploy-field-description__column">
+    <div class="deploy-field-description__value">
+      {{ field.type }}
+    </div>
+    <div class="deploy-field-description__value">
+      {{ field.module }}
+    </div>
+    <div class="deploy-field-description__value">
+      {{ field.name }}
+    </div>
+    <div class="deploy-field-description__value">
+      {% if field.edit %}
+        FALSE
+      {% else %}
+        TRUE
+      {% endif %}
+    </div>
+  </div>
+</div>

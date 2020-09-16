@@ -1,0 +1,56 @@
+.deploy-field-wrapper {
+  position: relative;
+}
+
+.deploy-field-description {
+  display: flex;
+  background: #353641;
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 10px;
+  color: white;
+  font-size: 0.8em;
+  border-radius: 2px;
+  transition: border-left .2s ease-in-out;
+}
+
+.deploy-field-description:hover {
+  border-left: 5px solid #42a877;
+}
+
+.deploy-field-description__column {
+  padding: 5px;
+}
+
+.deploy-field-delete__fake .deploy-field-delete__button {
+  background: #e34f4f;
+  margin-right: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.deploy-field-delete__fake .deploy-field-delete.button {
+  background: #7a2121;
+  margin-right: 0;
+  color: white;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
+  transform: translateX(-100%);
+  transition: transform .5s ease-in-out;
+}
+
+.deploy-field-delete__fake--open .deploy-field-delete.button {
+  transform: translateX(0);
+}
+
+.deploy-field-pre {
+  display: inline-block;
+  margin: 0;
+  vertical-align: text-top;
+  color: white;
+  background: #555661;
+  padding: 0 5px;
+  border-radius: 2px;
+}

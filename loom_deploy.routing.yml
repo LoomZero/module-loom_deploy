@@ -1,0 +1,9 @@
+
+loom.deploy.state_form:
+  path: '/admin/config/system/deploy'
+  defaults:
+    _form: '\Drupal\loom_deploy\Form\DeployStateForm'
+    _title: 'DeployStateForm'
+  requirements:
+    _access: 'TRUE'
+

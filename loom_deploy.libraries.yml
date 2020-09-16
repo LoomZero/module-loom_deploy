@@ -1,0 +1,6 @@
+deploy_field:
+  css:
+    component:
+      css/deploy-field.css: {}
+  js:
+    js/deploy-field.js: {}

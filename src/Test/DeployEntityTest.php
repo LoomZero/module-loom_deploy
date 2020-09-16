@@ -7,10 +7,10 @@ use Drupal\loom_deploy\Exception\DeployErrorException;
 use Drupal\loom_deploy\Manager\DeployManager;
 use Exception;
 
-class DeployTest implements DeployInterface {
+class DeployEntityTest implements DeployInterface {
 
   public function name(): string {
-    return 'Deploy Test';
+    return 'Deploy Entity Test';
   }
 
   public function check(DeployManager $manager): bool {
@@ -18,7 +18,8 @@ class DeployTest implements DeployInterface {
   }
 
   public function execute(DeployManager $manager) {
-    $manager->entityCreate('test', 'node', ['type' => 'article', 'title' => 'Cool', 'field_number' => 30]);
+    $manager->entity()->create('test', 'node', ['type' => 'page', 'title' => 'Test', 'field_number' => 15], ['title']);
+    $manager->entity()->create('test_2', 'node', ['type' => 'page', 'title' => 'Test 2', 'field_number' => 10], ['field_number']);
   }
 
 }

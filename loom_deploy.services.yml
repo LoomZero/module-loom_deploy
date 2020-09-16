@@ -3,7 +3,19 @@ services:
     class: Drupal\loom_deploy\Manager\DeployManager
     tags:
       - { name: service_collector, tag: loom_deploy, call: addService }
-  loom.deploy.test:
-    class: Drupal\loom_deploy\Test\DeployTest
+  loom.deploy.form.manager:
+    class: Drupal\loom_deploy\Manager\DeployFormManager
     tags:
-        - { name: loom_deploy }
+      - { name: service_collector, tag: loom_deploy_field_type, call: addType }
+  loom.deploy.field_type.entity:
+    class: Drupal\loom_deploy\Type\DeployFieldEntityType
+    tags:
+      - { name: loom_deploy_field_type }
+  loom.deploy.entity.test:
+    class: Drupal\loom_deploy\Test\DeployEntityTest
+    tags:
+      - { name: loom_deploy }
+  loom.deploy.files.test:
+    class: Drupal\loom_deploy\Test\DeployFilesTest
+    tags:
+      - { name: loom_deploy }

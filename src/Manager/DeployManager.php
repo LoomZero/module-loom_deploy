@@ -4,15 +4,13 @@ namespace Drupal\loom_deploy\Manager;
 
 use Drupal;
 use Drupal\Console\Core\Style\DrupalStyle;
-use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Entity\FieldableEntityInterface;
-use Drupal\Core\File\FileSystemInterface;
+use Drupal\Core\Url;
 use Drupal\loom_deploy\Command\DeployCommand;
 use Drupal\loom_deploy\Deploy\DeployInterface;
 use Drupal\loom_deploy\Exception\DeployCollectionException;
 use Drupal\loom_deploy\Exception\DeployErrorException;
 use Throwable;
+use function get_class;
 
 class DeployManager {
 
@@ -22,15 +20,31 @@ class DeployManager {
   private $sorted = NULL;
   /** @var DeployCommand */
   private $command = NULL;
-  /** @var FileSystemInterface */
-  private $fs = NULL;
-  /** @var EntityTypeManagerInterface */
-  private $etm = NULL;
+
+  /** @var DeployEntityManager */
+  private $entity = NULL;
+  /** @var DeployFileManager */
+  private $file = NULL;
 
   private $exceptions = 0;
   private $executed = 0;
 
   private $current = NULL;
+  private $cache = [];
+
+  public function entity(): DeployEntityManager {
+    if ($this->entity === NULL) {
+      $this->entity = new DeployEntityManager($this);
+    }
+    return $this->entity;
+  }
+
+  public function file(): DeployFileManager {
+    if ($this->file === NULL) {
+      $this->file = new DeployFileManager($this);
+    }
+    return $this->file;
+  }
 
   public function addService(DeployInterface $service, $priority = 0): DeployManager {
     $this->services[$priority][] = $service;
@@ -58,21 +72,11 @@ class DeployManager {
     return $this->command->getIo();
   }
 
-  public function fs(): FileSystemInterface {
-    if ($this->fs === NULL) {
-      $this->fs = Drupal::service('file_system');
+  public function getModule(DeployInterface $object = NULL): ?string {
+    if ($object === NULL) {
+      $object = $this->current['deploy'];
     }
-    return $this->fs;
-  }
 
-  public function entityTypeManager(): EntityTypeManagerInterface {
-    if ($this->etm === NULL) {
-      $this->etm = Drupal::entityTypeManager();
-    }
-    return $this->etm;
-  }
-
-  public function getModule(DeployInterface $object): ?string {
     $exploded = explode('\\', get_class($object));
     if ($exploded[0] === 'Drupal') {
       return $exploded[1];
@@ -83,7 +87,6 @@ class DeployManager {
   public function execute(DeployCommand $command) {
     $this->command = $command;
     foreach ($this->getDeploys() as $deploy) {
-      $this->getModule($deploy);
       $this->getIo()->section('Execute ' . $deploy->name());
       if ($deploy->check($this)) {
         try {
@@ -105,7 +108,9 @@ class DeployManager {
         }
 
         if (empty($this->current['errors'])) {
-          $this->getIo()->successLite('Success');
+          $this->success('Success deploy [deploy]', [
+            'deploy' => $deploy->name(),
+          ]);
         } else {
           foreach ($this->current['errors'] as $error) {
             $this->exceptions++;
@@ -116,11 +121,17 @@ class DeployManager {
       }
     }
 
-    $this->getIo()->section('Result:');
     if ($this->exceptions > 0) {
-      $this->getIo()->errorLite('Executed ' . $this->executed  . ' deploy scripts with ' . $this->exceptions . ' error`s');
+      $this->getIo()->error([
+        'Result:',
+        'Executed ' . $this->executed  . ' deploy scripts with ' . $this->exceptions . ' error`s',
+        'More infos on ' . Url::fromRoute('dblog.overview')->setAbsolute()->toString(),
+      ]);
     } else {
-      $this->getIo()->successLite('Executed ' . $this->executed . ' deploy scripts.');
+      $this->getIo()->success([
+        'Result:',
+        'Executed ' . $this->executed . ' deploy scripts.',
+      ]);
     }
   }
 
@@ -140,123 +151,71 @@ class DeployManager {
     }
   }
 
-  public function entityCreate(string $ident, string $type, array $fields = []): ?EntityInterface {
-    $entity = $this->entityPrepare($ident, $type, $fields);
-    if ($entity !== NULL) {
-      return $this->entitySave($ident, $entity);
-    } else {
-      return NULL;
-    }
-  }
-
-  public function entityPrepare(string $ident, string $type, array $fields = []): ?EntityInterface {
-    $this->log('Prepare entity [type] with identifier [ident]', [
-      'type' => $type,
-      'ident' => $ident,
-    ]);
-    if (!$this->checkDeployIdent($ident)) {
-      return $this->entityTypeManager()->getStorage($type)->create($fields);
-    } else {
-      return NULL;
-    }
-  }
-
-  public function entitySave(string $ident, EntityInterface $entity): EntityInterface {
-    $this->log('Save entity with identifier [ident].', [
-      'ident' => $ident,
-    ]);
-    if ($entity instanceof FieldableEntityInterface) {
-      $error = [];
-      foreach ($entity->validate() as $violation) {
-        $error[] = 'Field ' . $violation->getPropertyPath() . ': ' . $violation->getMessage();
-      }
-      if (count($error)) {
-        $this->setError('Error on create ' . $entity->bundle() . ' ' . $ident, $error);
-      }
-    }
-    $entity->save();
-    $this->setDeployIdent($ident, 'entity', [
-      'id' => $entity->id(),
-      'type' => $entity->getEntityTypeId(),
-    ]);
-    return $entity;
-  }
-
   /**
-   * @param string $from Glob support
-   * @param string $to Glob support
+   * @param string $ident
+   * @param bool $edit if edit is true do nothing, it is edited
+   *
+   * @return array|null
    */
-  public function copyDir(string $from, string $to) {
-    $this->log('Copy directory [from] to [to]', [
-      'from' => $from,
-      'to' => $to,
-    ]);
-
-    if (!$this->fs()->prepareDirectory($to)) {
-      $this->log('Create directory [to]', ['to' => $to]);
-      if ($this->fs()->mkdir($to)) {
-        $this->fs()->prepareDirectory($to);
+  public function checkDeployIdent(string $ident, bool $edit = FALSE): ?array {
+    if (!isset($this->cache[$ident])) {
+      $value = Drupal::state()->get('loom_deploy.' . $ident);
+      if (is_array($value) && ($edit && !$value['edit'] || !$edit)) {
+        $this->success('Check ident [ident] success', ['ident' => $ident]);
+        $this->cache[$ident] = $value;
       } else {
-        $this->getIo()->errorLite('Directory can not be created "' . $to . '"');
+        $this->error('Check ident [ident] failed', ['ident' => $ident]);
+        $this->cache[$ident] = TRUE;
       }
     }
-
-    $files = glob($from);
-    foreach ($files as $file) {
-      $this->copyFile($file, $to . '/' . basename($file));
-    }
+    return ($this->cache[$ident] === TRUE ? NULL : $this->cache[$ident]);
   }
 
-  /**
-   * @param $from
-   * @param $to
-   */
-  public function copyFile($from, $to) {
-    if (!file_exists($to)) {
-      $this->log('Copy [from] to [to] ...', [
-        'from' => $from,
-        'to' => $to,
-      ]);
-      $data = file_get_contents($from);
-      $file = file_save_data($data, $to, FileSystemInterface::EXISTS_REPLACE);
-      if ($file) {
-        $file->setPermanent();
-        $file->save();
-      } else {
-        $this->getIo()->errorLite('Error by copy file "' . $from . '"');
-      }
-    } else {
-      $this->log('Already copied [to]', ['to' => $to]);
-    }
-  }
-
-  public function checkDeployIdent(string $ident): bool {
-    $value = Drupal::state()->get('loom_deploy.' . $ident) !== NULL;
-    if ($value) {
-      $this->getIo()->successLite('Check "' . $ident . '" success');
-    } else {
-      $this->getIo()->errorLite('Check "' . $ident . '" failed');
-    }
-    return $value;
-  }
-
-  public function setDeployIdent(string $ident, string $type, $value) {
+  public function setDeployIdent(string $ident, string $type, $value, bool $edit = FALSE) {
     $this->log('Set deploy state [type] for [ident] value: [value]', [
       'type' => $type,
       'ident' => $ident,
       'value' => print_r($value, TRUE),
     ]);
-    Drupal::state()->set('loom_deploy.' . $ident, [
+    $state = [
       'type' => $type,
       'value' => $value,
-    ]);
+      'ident' => $ident,
+      'edit' => $edit,
+      'class' => get_class($this->current['deploy']),
+      'module' => $this->getModule($this->current['deploy']),
+      'name' => $this->current['deploy']->name(),
+    ];
+    Drupal::state()->set('loom_deploy.' . $ident, $state);
+    $this->cache[$ident] = $state;
   }
 
-  public function log($message, array $placeholders = []) {
+  public function log(string $message, array $placeholders = []) {
     foreach ($placeholders as $placeholder => $value) {
       $message = str_replace('[' . $placeholder . ']', '<fg=green>"' . $value . '"</>', $message);
     }
     $this->getIo()->writeln($message);
+  }
+
+  public function success(string $message, array $placeholders = []) {
+    foreach ($placeholders as $placeholder => $value) {
+      $message = str_replace('[' . $placeholder . ']', '<fg=green>"' . $value . '"</>', $message);
+    }
+    $this->getIo()->successLite($message);
+  }
+
+  public function warn(string $message, array $placeholders = []) {
+    foreach ($placeholders as $placeholder => $value) {
+      $message = str_replace('[' . $placeholder . ']', '<fg=green>"' . $value . '"</>', $message);
+    }
+    $this->getIo()->warningLite($message);
+  }
+
+  public function error(string $message, array $placeholders = []) {
+    foreach ($placeholders as $placeholder => $value) {
+      $message = str_replace('[' . $placeholder . ']', '<fg=green>"' . $value . '"</>', $message);
+    }
+    $this->getIo()->errorLite($message);
   }
 
 }
