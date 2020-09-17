@@ -10,6 +10,7 @@
       var form = $(this);
 
       form.find('.deploy-field-delete:not(.deploy-field-delete__processed)').each(script.removeButton);
+      form.find('.deploy-field-wrapper').each(script.errorHandler);
     },
 
     removeButton: function () {
@@ -35,6 +36,14 @@
         .on('mouseenter', function () {
           clearTimeout(timeout);
         });
+    },
+
+    errorHandler: function () {
+      var fieldset = $(this);
+
+      if (fieldset.find('.error').length) {
+        fieldset.addClass('error');
+      }
     },
 
   };

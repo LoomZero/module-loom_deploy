@@ -9,6 +9,7 @@ use Drupal\loom_deploy\Command\DeployCommand;
 use Drupal\loom_deploy\Deploy\DeployInterface;
 use Drupal\loom_deploy\Exception\DeployCollectionException;
 use Drupal\loom_deploy\Exception\DeployErrorException;
+use Drupal\loom_deploy\Manager\DeployStateManager;
 use Throwable;
 use function get_class;
 
@@ -25,6 +26,8 @@ class DeployManager {
   private $entity = NULL;
   /** @var DeployFileManager */
   private $file = NULL;
+  /** @var DeployStateManager */
+  private $state = NULL;
 
   private $exceptions = 0;
   private $executed = 0;
@@ -44,6 +47,13 @@ class DeployManager {
       $this->file = new DeployFileManager($this);
     }
     return $this->file;
+  }
+
+  public function state(): DeployStateManager {
+    if ($this->state === NULL) {
+      $this->state = new DeployStateManager($this);
+    }
+    return $this->state;
   }
 
   public function addService(DeployInterface $service, $priority = 0): DeployManager {

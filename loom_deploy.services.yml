@@ -11,11 +11,19 @@ services:
     class: Drupal\loom_deploy\Type\DeployFieldEntityType
     tags:
       - { name: loom_deploy_field_type }
+  loom.deploy.field_type.state:
+    class: Drupal\loom_deploy\Type\DeployFieldStateType
+    tags:
+      - { name: loom_deploy_field_type }
   loom.deploy.entity.test:
     class: Drupal\loom_deploy\Test\DeployEntityTest
     tags:
       - { name: loom_deploy }
   loom.deploy.files.test:
     class: Drupal\loom_deploy\Test\DeployFilesTest
+    tags:
+      - { name: loom_deploy }
+  loom.deploy.state.test:
+    class: Drupal\loom_deploy\Test\DeployStateTest
     tags:
       - { name: loom_deploy }

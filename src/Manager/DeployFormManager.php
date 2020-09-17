@@ -2,6 +2,7 @@
 
 namespace Drupal\loom_deploy\Manager;
 
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\loom_deploy\Deploy\DeployFieldTypeInterface;
 use function in_array;
 use function serialize;
@@ -31,10 +32,10 @@ class DeployFormManager {
     return NULL;
   }
 
-  public function getWidget($field): array {
+  public function getWidget(array $field, FormStateInterface $form_state): array {
     $type = $this->getTypeClass($field['type']);
     if ($type === NULL) return $this->getDefaultWidget($field);
-    return $type->widget($field);
+    return $type->widget($field, $form_state);
   }
 
   public function getDefaultWidget($field): array {

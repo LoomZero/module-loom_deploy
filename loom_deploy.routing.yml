@@ -1,4 +1,3 @@
-
 loom.deploy.state_form:
   path: '/admin/config/system/deploy'
   defaults:
@@ -6,4 +5,3 @@ loom.deploy.state_form:
     _title: 'DeployStateForm'
   requirements:
     _access: 'TRUE'
-

@@ -1,0 +1,5 @@
+loom.deploy.state_form:
+  title: 'LOOM Deploy'
+  parent: system.admin_config
+  description: 'LOOM Deploy'
+  route_name: loom.deploy.state_form

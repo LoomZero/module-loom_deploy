@@ -6,6 +6,7 @@ use Drupal;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Render\Element;
 use Drupal\loom_deploy\Manager\DeployFormManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\loom_deploy\Manager\DeployManager;
@@ -43,7 +44,7 @@ class DeployStateForm extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $fields = $this->getDeployFields();
+    $modules = $this->getDeployFields();
 
     $form['fields'] = [
       '#type' => 'container',
@@ -51,9 +52,20 @@ class DeployStateForm extends FormBase {
         'id' => $this->formWrapper,
       ],
     ];
-    if (count($fields)) {
-      foreach ($fields as $key => $field) {
-        $form['fields'][$key] = $this->getField($field);
+    if (count($modules)) {
+      foreach ($modules as $module => $fields) {
+        $form['fields'][$module] = [
+          '#type' => 'details',
+          '#title' => $module,
+          '#attributes' => [
+            'class' => [
+              'deploy-module-wrapper',
+            ],
+          ],
+        ];
+        foreach ($fields as $key => $field) {
+          $form['fields'][$module][$key] = $this->getField($field, $form_state);
+        }
       }
     } else {
       $form['fields']['info'] = [
@@ -76,13 +88,15 @@ class DeployStateForm extends FormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    $fields = $this->getDeployFields();
+    $modules = $this->getDeployFields();
     $values = $form_state->getValue('fields');
 
-    foreach ($fields as $key => $field) {
-      $type = $this->loomFormManager->getTypeClass($field['type']);
-      if ($type !== NULL) {
-        $type->validate($form['fields'][$key], $field, $values[$key]['widget']['value'], $form_state);
+    foreach ($modules as $module => $fields) {
+      foreach ($fields as $key => $field) {
+        $type = $this->loomFormManager->getTypeClass($field['type']);
+        if ($type !== NULL) {
+          $type->validate($form['fields'][$module][$key], $field, $values[$module][$key]['widget']['value'], $form_state);
+        }
       }
     }
   }
@@ -91,23 +105,25 @@ class DeployStateForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $fields = $this->getDeployFields();
+    $modules = $this->getDeployFields();
     $values = $form_state->getValue('fields');
 
-    foreach ($fields as $key => $field) {
-      $type = $this->loomFormManager->getTypeClass($field['type']);
-      if ($type === NULL) {
-        $field['value'] = unserialize($values[$key]['widget']['value']);
-        $field['edit'] = TRUE;
-      } else {
-        $field['value'] = $type->toValue($field, $values[$key]['widget']['value']);
-        $field['edit'] = TRUE;
+    foreach ($modules as $module => $fields) {
+      foreach ($fields as $key => $field) {
+        $type = $this->loomFormManager->getTypeClass($field['type']);
+        if ($type === NULL) {
+          $field['value'] = unserialize($values[$module][$key]['widget']['value']);
+          $field['edit'] = TRUE;
+        } else {
+          $field['value'] = $type->toValue($field, $values[$module][$key]['widget']['value']);
+          $field['edit'] = TRUE;
+        }
+        Drupal::state()->set($key, $field);
       }
-      Drupal::state()->set($key, $field);
     }
   }
 
-  public function getField(array $field): array {
+  public function getField(array $field, FormStateInterface $form_state): array {
     return [
       '#type' => 'fieldset',
       '#title' => 'Ident: ' . $field['ident'],
@@ -119,7 +135,7 @@ class DeployStateForm extends FormBase {
       ],
       'widget' => [
         '#type' => 'container',
-        'value' => $this->loomFormManager->getWidget($field),
+        'value' => $this->loomFormManager->getWidget($field, $form_state),
       ],
       'description' => [
         '#theme' => 'deploy_field_description',
@@ -127,7 +143,7 @@ class DeployStateForm extends FormBase {
       ],
       'remove' => [
         '#type' => 'button',
-        '#value' => 'Sure?',
+        '#value' => 'Confirm?',
         '#name' => 'remove_' . $field['ident'],
         '#attributes' => [
           'class' => [
@@ -151,7 +167,8 @@ class DeployStateForm extends FormBase {
       $select->condition('k.name', 'loom_deploy.%', 'LIKE');
 
       foreach ($select->execute()->fetchAllKeyed() as $key => $value) {
-        $this->cache[$key] = unserialize($value);
+        $value = unserialize($value);
+        $this->cache[$value['module']][$key] = $value;
       }
     }
     return $this->cache;
@@ -159,11 +176,17 @@ class DeployStateForm extends FormBase {
 
   public function removeValue(&$form, FormStateInterface $form_state, $form_id) {
     $trigger = $form_state->getTriggeringElement();
-    $field = $trigger['#parents'][1];
+    $module = $trigger['#parents'][1];
+    $field = $trigger['#parents'][2];
     Drupal::state()->delete($field);
 
+    $form['fields'][$module]['#open'] = TRUE;
+    unset($form['fields'][$module][$field]);
+    if (!count(Element::children($form['fields'][$module]))) {
+      unset($form['fields'][$module]);
+    }
+
     $form_state->setRebuild();
-    unset($form['fields'][$field]);
     return $form['fields'];
   }
 
